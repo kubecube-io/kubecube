@@ -73,8 +73,6 @@ func makeClusterInfos(clusters clusterv1.ClusterList, pivotCli kubernetes.Client
 	infos := make([]clusterInfo, 0)
 	for _, item := range clusters.Items {
 		v := item.Name
-		cli := clients.Interface().Kubernetes(v)
-
 		info := clusterInfo{ClusterName: v}
 
 		cluster := clusterv1.Cluster{}
@@ -93,6 +91,14 @@ func makeClusterInfos(clusters clusterv1.ClusterList, pivotCli kubernetes.Client
 		info.KubeApiServer = cluster.Spec.KubernetesAPIEndpoint
 		info.NetworkType = cluster.Spec.NetworkType
 
+		cli := clients.Interface().Kubernetes(v)
+		if cli == nil {
+			info.Status = string(clusterv1.ClusterAbnormal)
+			infos = append(infos, info)
+			continue
+		}
+
+		// todo(weilaaa): context may be exceed if metrics query timeout
 		nodesMc, err := cli.Metrics().MetricsV1beta1().NodeMetricses().List(ctx, metav1.ListOptions{})
 		if err != nil {
 			// record error from metric server, but ensure return normal
